@@ -4,9 +4,9 @@ from tkinter import Tk
 from tkinter.filedialog import askdirectory
 
 
-# Função para inicializar o banco de dados e garantir que as tabelas existem
-def initialize_database():
-    conn = sqlite3.connect("photographers.db")
+# Função para inicializar o banco de dados de um evento específico
+def initialize_database(db_name):
+    conn = sqlite3.connect(f"{db_name}.db")
     cursor = conn.cursor()
 
     cursor.execute(
@@ -35,9 +35,53 @@ def initialize_database():
     return conn, cursor
 
 
-# Função para limpar o banco de dados e recriar as tabelas
-def reset_database():
-    conn, cursor = initialize_database()
+# Função para listar eventos existentes (bancos de dados)
+def list_events():
+    databases = [f for f in os.listdir() if f.endswith(".db")]
+    events = [db.replace(".db", "") for db in databases]
+    return events
+
+
+# Função para selecionar ou criar um evento
+# Função para selecionar ou criar um evento
+def select_event():
+    while True:
+        events = list_events()
+        if events:
+            print("\nEventos disponíveis:")
+            for i, event in enumerate(events):
+                print(f"{i + 1}. {event}")
+        else:
+            print("Nenhum evento disponível.")
+
+        print(f"{len(events) + 1}. Criar novo evento")
+        print(f"{len(events) + 2}. Sair")
+
+        option = input(
+            "Digite o número do evento ou a opção para criar um novo evento: "
+        )
+
+        if option.isdigit():
+            option = int(option)
+            if 1 <= option <= len(events):
+                return events[option - 1]  # Retorna o nome do evento selecionado
+            elif option == len(events) + 1:
+                event_name = input("Digite o nome do novo evento: ")
+                if event_name:
+                    # Criar imediatamente o banco de dados do novo evento
+                    initialize_database(
+                        event_name
+                    )  # Inicializa o banco de dados para garantir que ele seja criado
+                    return event_name  # Retorna o nome do novo evento
+            elif option == len(events) + 2:
+                print("Saindo do programa.")
+                exit()  # Finaliza o programa
+        print("Opção inválida. Tente novamente.")
+
+
+# Função para limpar o banco de dados de um evento
+def reset_database(db_name):
+    conn, cursor = initialize_database(db_name)
 
     # Apagar as tabelas existentes
     cursor.execute("DROP TABLE IF EXISTS photographers")
@@ -69,7 +113,7 @@ def reset_database():
 
     conn.commit()
     conn.close()
-    print("Banco de dados limpo e reinicializado com sucesso.")
+    print(f"Banco de dados do evento '{db_name}' limpo e reinicializado com sucesso.")
 
 
 # Função para adicionar fotógrafo
@@ -93,8 +137,8 @@ def add_photo(cursor, conn, file_name, photographer_name):
 
 
 # Função para processar as pastas e registrar os fotógrafos e suas fotos
-def process_folders(directory_path):
-    conn, cursor = initialize_database()
+def process_folders(directory_path, db_name):
+    conn, cursor = initialize_database(db_name)
 
     for folder_name in os.listdir(directory_path):
         photographer_folder_path = os.path.join(directory_path, folder_name)
@@ -112,8 +156,8 @@ def process_folders(directory_path):
 
 
 # Função para comparar fotos selecionadas pelos clientes com as fotos dos fotógrafos
-def compare_selected_photos(selected_folder_path):
-    conn = sqlite3.connect("photographers.db")
+def compare_selected_photos(selected_folder_path, db_name):
+    conn = sqlite3.connect(f"{db_name}.db")
     cursor = conn.cursor()
 
     # Usar um conjunto para armazenar fotos únicas selecionadas
@@ -175,30 +219,33 @@ def select_folder():
 # Função principal
 if __name__ == "__main__":
     while True:
-        print("Escolha uma opção:")
-        print("1. Limpar e reinicializar o banco de dados")
-        print("2. Processar pastas de fotógrafos")
-        print("3. Comparar fotos selecionadas pelos clientes")
-        print("4. Sair")
+        db_name = select_event()  # Pergunta qual evento usar ou criar um novo evento
 
-        option = input("Digite a opção desejada: ")
+        while True:
+            print(f"\nBanco de dados em uso: {db_name}")
+            print("Escolha uma opção:")
+            print("1. Limpar e reinicializar o banco de dados")
+            print("2. Processar pastas de fotógrafos")
+            print("3. Comparar fotos selecionadas pelos clientes")
+            print("4. Voltar para seleção de eventos")
 
-        if option == "1":
-            reset_database()
-        elif option == "2":
-            directory_path = select_folder()
-            if directory_path:
-                process_folders(directory_path)
+            option = input("Digite a opção desejada: ")
+
+            if option == "1":
+                reset_database(db_name)
+            elif option == "2":
+                directory_path = select_folder()
+                if directory_path:
+                    process_folders(directory_path, db_name)
+                else:
+                    print("Nenhuma pasta foi selecionada.")
+            elif option == "3":
+                selected_folder_path = select_folder()
+                if selected_folder_path:
+                    compare_selected_photos(selected_folder_path, db_name)
+                else:
+                    print("Nenhuma pasta foi selecionada.")
+            elif option == "4":
+                break  # Volta para a seleção de eventos
             else:
-                print("Nenhuma pasta foi selecionada.")
-        elif option == "3":
-            selected_folder_path = select_folder()
-            if selected_folder_path:
-                compare_selected_photos(selected_folder_path)
-            else:
-                print("Nenhuma pasta foi selecionada.")
-        elif option == "4":
-            print("Saindo...")
-            break
-        else:
-            print("Opção inválida. Tente novamente.")
+                print("Opção inválida. Tente novamente.")
